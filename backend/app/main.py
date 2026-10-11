@@ -8,6 +8,13 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from typing import Dict, Any, Optional
 
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 try:
     from .config import MODELS_REGISTRY_PATH, DB_PATH, BENCHMARK_PATH
     from .models.schemas import RouteRequest, RouteResponse
@@ -486,17 +493,36 @@ try:
     async def api_benchmark(data: Dict[str, Any] = None):
         count = int((data or {}).get("count", 30))
         return run_workload_comparison(num_requests=count)
+
+    @app.get("/telemetry")
+    async def api_telemetry():
+        return TELEMETRY_STORE.get_all_stats()
+
+    dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+    index_file = dist_dir / "index.html"
+
+    @app.get("/", response_class=HTMLResponse)
+    async def api_root():
+        if index_file.exists():
+            with open(index_file, "r", encoding="utf-8") as f:
+                return f.read()
+        return "<html><body><h1>RouteIQ AI Gateway</h1><p>Online. Dashboard assets missing.</p></body></html>"
 except ImportError:
     app = None
 
 def run_server(host: str = "0.0.0.0", port: int = 8000):
-    server = ThreadedHTTPServer((host, port), RouteIQHandler)
-    print(f"🚀 RouteIQ Gateway Server running at http://{host}:{port}")
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\nStopping RouteIQ Gateway Server...")
-        server.server_close()
+        import uvicorn
+        print(f"[RouteIQ] Gateway Server running via Uvicorn/FastAPI at http://{host}:{port}")
+        uvicorn.run(app, host=host, port=port, log_level="info")
+    except Exception as exc:
+        print(f"[RouteIQ] Uvicorn unavailable ({exc}), falling back to ThreadedHTTPServer at http://{host}:{port}")
+        server = ThreadedHTTPServer((host, port), RouteIQHandler)
+        try:
+            server.serve_forever()
+        except KeyboardInterrupt:
+            print("\nStopping RouteIQ Gateway Server...")
+            server.server_close()
 
 if __name__ == "__main__":
     import argparse

@@ -5,12 +5,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = Path(__file__).resolve().parent
 
 DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_REGISTRY_PATH = APP_DIR / "models" / "registry.json"
 DB_PATH = DATA_DIR / "routeiq_audit.db"
 ESTIMATOR_MODEL_PATH = DATA_DIR / "estimator_tfidf.joblib"
 PROMPTS_PATH = DATA_DIR / "prompts_300.json"
 BENCHMARK_PATH = DATA_DIR / "benchmark_30.json"
 
+MODEL_DIR = Path(os.environ.get("MODEL_DIR", str(BASE_DIR.parent / "model")))
 OLLAMA_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
 # Hard Rule & Circuit Breaker Thresholds

@@ -17,7 +17,7 @@ def rank_candidates(candidates: List[CandidateAudit], preference: str = "lowest_
     elif preference == "highest_capability":
         return sorted(candidates, key=lambda c: (-c.capability_score, c.predicted_cost_usd))
 
-    elif preference == "balanced_pareto":
+    elif preference in ("balanced_pareto", "pareto"):
         costs = [c.predicted_cost_usd for c in candidates]
         lats = [c.predicted_latency_ms for c in candidates]
         caps = [c.capability_score for c in candidates]

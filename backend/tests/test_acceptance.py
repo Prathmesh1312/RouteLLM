@@ -243,7 +243,7 @@ class TestRouteIQAcceptanceCriteria(unittest.TestCase):
         the Independent Auditor verifies compliance and the SQLite Ledger records 0 violations.
         """
         from backend.app.main import handle_route_request, AUDIT_DB
-        AUDIT_DB.clear()
+        prev_violations, prev_total = AUDIT_DB.get_violation_counts()
 
         # Impossible SLA request
         res = handle_route_request({
@@ -258,49 +258,78 @@ class TestRouteIQAcceptanceCriteria(unittest.TestCase):
         self.assertEqual(len(res["auditor"]["violations"]), 0)
 
         violations, total = AUDIT_DB.get_violation_counts()
-        self.assertEqual(violations, 0)
-        self.assertEqual(total, 1)
+        self.assertEqual(violations, prev_violations)
+        self.assertEqual(total, prev_total + 1)
 
     def test_T10_tamper_detection_in_hash_chain(self):
         """
         T10: Cryptographic Tamper-Evidence:
         Modifying any historic audit record immediately corrupts the SHA-256 hash chain
-        and is flagged by verify_chain_integrity().
+        and is flagged by verify_chain_integrity() in an isolated temporary test database.
         """
-        from backend.app.main import handle_route_request, AUDIT_DB
-        AUDIT_DB.clear()
+        import tempfile
+        import uuid
+        import datetime
+        from backend.app.storage.db import AuditDatabase
 
-        # Insert 3 compliant records
-        for i in range(3):
-            handle_route_request({
-                "prompt": f"Audit test query {i}",
-                "max_latency_ms": 1000.0,
-                "max_cost_usd": 0.01,
-                "min_capability": 0.35
-            })
+        temp_db_path = Path(tempfile.gettempdir()) / f"routeiq_audit_test_{uuid.uuid4().hex[:8]}.db"
+        test_db = AuditDatabase(db_path=temp_db_path)
 
-        status_before = AUDIT_DB.verify_chain_integrity()
-        self.assertTrue(status_before["valid"])
-        self.assertEqual(status_before["total_records"], 3)
+        try:
+            # Insert 3 compliant records in the isolated test DB
+            for i in range(3):
+                req_dummy = {
+                    "prompt": f"Audit test query {i}",
+                    "max_latency_ms": 1000.0,
+                    "max_cost_usd": 0.01,
+                    "min_capability": 0.35,
+                    "preference": "lowest_cost",
+                    "required_context": 8192
+                }
+                resp_dummy = {
+                    "request_id": f"req_test_{i}_{uuid.uuid4().hex[:6]}",
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    "chosen_model": "llama-3.2-1b",
+                    "no_valid_model": False,
+                    "actual_metrics": {
+                        "total_latency_ms": 180.0 + i * 10,
+                        "total_cost_usd": 0.00015,
+                        "model_capability": 0.42,
+                        "model_context": 8192
+                    }
+                }
+                verdict_dummy = {
+                    "compliant": True,
+                    "violations": []
+                }
+                test_db.insert_audit_record(req_dummy, resp_dummy, verdict_dummy)
 
-        records = AUDIT_DB.get_audit_records()
-        self.assertEqual(len(records), 3)
-        target_id = records[1]["id"]  # The middle record
+            status_before = test_db.verify_chain_integrity()
+            self.assertTrue(status_before["valid"])
+            self.assertEqual(status_before["total_records"], 3)
 
-        # Programmatically tamper with that record
-        with AUDIT_DB._lock, AUDIT_DB._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE audit_logs SET actual_latency_ms = 9999.0 WHERE id = ?", (target_id,))
-            conn.commit()
-            self.assertEqual(cursor.rowcount, 1)
+            records = test_db.get_audit_records()
+            self.assertEqual(len(records), 3)
+            target_id = records[1]["id"]  # The middle record
 
-        status_after = AUDIT_DB.verify_chain_integrity()
-        self.assertFalse(status_after["valid"])
-        self.assertEqual(status_after["broken_at_id"], target_id)
-        self.assertIn("Tampering detected", status_after["message"])
+            # Programmatically tamper with that historical record
+            with test_db._lock, test_db._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE audit_logs SET actual_latency_ms = 9999.0 WHERE id = ?", (target_id,))
+                conn.commit()
+                self.assertEqual(cursor.rowcount, 1)
 
-        # Clean up
-        AUDIT_DB.clear()
+            status_after = test_db.verify_chain_integrity()
+            self.assertFalse(status_after["valid"])
+            self.assertEqual(status_after["broken_at_id"], target_id)
+            self.assertIn("Tampering detected", status_after["message"])
+
+        finally:
+            if temp_db_path.exists():
+                try:
+                    temp_db_path.unlink()
+                except Exception:
+                    pass
 
     def test_T11_genuine_breach_detection(self):
         """

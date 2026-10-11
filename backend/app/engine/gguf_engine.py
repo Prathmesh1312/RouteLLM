@@ -3,6 +3,7 @@ import struct
 import time
 import math
 import re
+import platform
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -15,17 +16,21 @@ except ImportError:
 
 class GGUFEngine:
     """
-    Apple Silicon Native GGUF Model Execution Engine.
+    High-Performance Native GGUF Model Execution Engine.
     Directly interfaces with quantized GGUF weights in the local `model/` repository.
     Supports:
-      1. Hardware-accelerated inference via llama_cpp (Metal on Apple Silicon) when installed.
+      1. Hardware-accelerated inference via llama_cpp when installed.
       2. Native high-fidelity GGUF binary inspection, tensor verification, and zero-cost local execution.
     """
     def __init__(self, model_dir: Optional[str] = None):
         if model_dir:
             self.model_dir = Path(model_dir)
         else:
-            self.model_dir = Path(__file__).resolve().parent.parent.parent.parent / "model"
+            try:
+                from ..config import MODEL_DIR
+                self.model_dir = MODEL_DIR
+            except Exception:
+                self.model_dir = Path(__file__).resolve().parent.parent.parent.parent / "model"
 
         self._models_catalog: Dict[str, Dict[str, Any]] = {}
         self._llama_instances: Dict[str, Any] = {}
@@ -190,7 +195,8 @@ class GGUFEngine:
         elapsed_ms = (time.perf_counter() - t_start) * 1000.0
 
         resp_text = self._generate_model_specific_response(model_id, model_name, arch, prompt, meta)
-        badge = f"[LOCAL GGUF: Apple Silicon ({meta.get('size_gb', 4.5)}GB Q4_K_M)]"
+        os_label = "Apple Silicon" if platform.system() == "Darwin" else f"{platform.system()} Native"
+        badge = f"[LOCAL GGUF: {os_label} ({meta.get('size_gb', 4.5)}GB Q4_K_M)]"
 
         return resp_text, tokens_in, tokens_out, round(elapsed_ms, 2), badge
 

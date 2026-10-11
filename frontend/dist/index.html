@@ -512,7 +512,7 @@
       <div class="max-w-5xl mx-auto space-y-5">
         <div>
           <h2 class="text-lg font-bold text-white flex items-center space-x-2">
-            <span>🖥️</span><span>Apple Silicon GGUF Models Inventory</span>
+            <span>🖥️</span><span>Local Quantized GGUF Models Inventory (Windows Native)</span>
           </h2>
           <p class="text-xs text-slate-400">
             Real Quantized GGUF models located in `/RouteLLM/model/`. Zero API fees, local execution.
@@ -1102,7 +1102,7 @@
             <div class="flex items-center justify-between">
               <div>
                 <h3 class="font-bold text-sm text-white">${m.name}</h3>
-                <span class="text-[10px] text-slate-400 font-mono">${m.family} &bull; Tier: ${m.tier.toUpperCase()}</span>
+                <span class="text-[10px] text-slate-400 font-mono">${m.family} &bull; Tier: ${m.tier.toUpperCase()} &bull; Slot ID: <code class="text-cyan-300 font-bold">${m.id}</code></span>
               </div>
               <span class="px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${isGGUF ? 'bg-cyan-950 text-cyan-300 border border-cyan-800' : 'bg-slate-800 text-slate-400'}">
                 ${isGGUF ? 'LOCAL GGUF (Q4_K_M)' : 'CLOUD FRONTIER'}

@@ -8,7 +8,7 @@ class TelemetryStore:
     Tracks rolling EMA latency, p95 latency, request counts, and error rates per model.
     """
     def __init__(self, alpha: float = 0.2, max_samples: int = 50):
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self.alpha = alpha  # EMA smoothing factor
         self.max_samples = max_samples
         self.ema_latencies: Dict[str, float] = {}

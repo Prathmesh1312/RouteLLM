@@ -15,7 +15,7 @@ if HAS_PYDANTIC:
         max_cost_usd: float = Field(..., gt=0, description="Hard maximum budget in USD")
         min_capability: float = Field(0.0, ge=0.0, le=1.0, description="Minimum capability score")
         required_context: Optional[int] = Field(None, ge=1, description="Required context window in tokens")
-        preference: str = Field("lowest_cost", pattern="^(lowest_cost|lowest_latency|highest_capability|balanced_pareto)$")
+        preference: str = Field("lowest_cost", pattern="^(lowest_cost|lowest_latency|highest_capability|balanced_pareto|pareto)$")
         expected_output_tokens: Optional[int] = Field(150, ge=1)
 
     class CandidateAudit(BaseModel):
@@ -79,7 +79,7 @@ else:
                 raise ValueError("max_cost_usd must be > 0")
             if not (0.0 <= min_capability <= 1.0):
                 raise ValueError("min_capability must be between 0.0 and 1.0")
-            valid_prefs = ["lowest_cost", "lowest_latency", "highest_capability", "balanced_pareto"]
+            valid_prefs = ["lowest_cost", "lowest_latency", "highest_capability", "balanced_pareto", "pareto"]
             if preference not in valid_prefs:
                 raise ValueError(f"preference must be one of {valid_prefs}")
 

@@ -216,7 +216,8 @@ class ResilientExecutor:
                 break
 
             # 2. Preference Ranking
-            ranked = rank_candidates(valid_candidates, request.preference)
+            pref = "balanced_pareto" if request.preference == "pareto" else request.preference
+            ranked = rank_candidates(valid_candidates, pref)
             chosen_candidate = ranked[0]
             m_id = chosen_candidate.model_id
             m_config = self.models_map[m_id]
@@ -344,7 +345,8 @@ class ResilientExecutor:
                     "model_name": m_config["name"],
                     "error": str(exc),
                     "time_spent_ms": round(call_elapsed_ms, 1),
-                    "remaining_latency_ms": max(0.0, round(remaining_latency_ms, 1))
+                    "remaining_latency_ms": max(0.0, round(remaining_latency_ms, 1)),
+                    "remaining_cost_usd": max(0.0, round(remaining_cost_usd, 6))
                 })
 
         # No valid model can satisfy remaining constraints -> Return structured refusal
